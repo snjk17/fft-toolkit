@@ -7,15 +7,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+
 class DataVisualizer:
     """
     解析済みのデータを受け取り、可視化（グラフ作成）を行うクラス。
     """
+
     def __init__(self):
         # sns.set_style("whitegrid")  # seabornへの依存を削除
         plt.style.use('seaborn-v0_8-whitegrid')  # 代替スタイル
 
-    def plot_timeseries(self, df, title="Time Series Data", save_path=None):
+    def plot_timeseries(self, df, title="Time Series Data", save_path=None, y_limit=None):
         """
         時系列データを可視化し、ファイルに保存する。
         """
@@ -24,54 +26,14 @@ class DataVisualizer:
         plt.title(title, fontsize=16)
         plt.xlabel("Sample Index")
         plt.ylabel("Value")
+
+        if y_limit and y_limit.get("min") is not None and y_limit.get("max") is not None:
+            plt.ylim(y_limit["min"], y_limit["max"])
+
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.tight_layout()
 
         if save_path:
-            plt.savefig(save_path, bbox_inches='tight')
-            print(f"  - 時系列グラフを保存しました: {save_path}")
-        else:
-            plt.show()
-        plt.close()
-
-    def plot_fft(
-        self,
-        frequencies,
-        amplitudes,
-        title="FFT Analysis",
-        x_limit=None,
-        y_limit=None,
-        save_path=None
-    ):
-        """
-        FFTの結果を可視化し、ファイルに保存する。
-        """
-        if x_limit:
-            min_freq = x_limit.get("min")
-            max_freq = x_limit.get("max")
-
-            # 周波数に基づいてデータをフィルタリング
-            freq_mask = np.ones_like(frequencies, dtype=bool)
-            if min_freq is not None:
-                freq_mask &= (frequencies >= min_freq)
-            if max_freq is not None:
-                freq_mask &= (frequencies <= max_freq)
-
-            frequencies = frequencies[freq_mask]
-            amplitudes = amplitudes[freq_mask]
-
-        plt.figure(figsize=(15, 7))
-        plt.plot(frequencies, amplitudes)
-        plt.title(title, fontsize=16)
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel("Amplitude")
-
-        if y_limit is not None:
-            plt.ylim(0, y_limit)
-
-        plt.grid(True, linestyle='--', alpha=0.6)
-        plt.tight_layout()
-
         if save_path:
             plt.savefig(save_path)
             print(f"  - FFTグラフを保存しました: {save_path}")
@@ -100,10 +62,19 @@ class DataVisualizer:
             print(f"統計推移のためのタイムスタンプ解析中にエラー: {e}")
             return
 
-        stats_to_plot = ['mean', 'std', 'max', 'min', 'skewness', 'kurtosis']
+        stats_to_plot = [
+            'mean',
+            'std',
+            'variance',
+            'max',
+            'min'
+        ]
 
         fig, axes = plt.subplots(
-            nrows=len(stats_to_plot), ncols=1, figsize=(15, 20), sharex=True
+            nrows=len(stats_to_plot),
+            ncols=1,
+            figsize=(15, 20),
+            sharex=True
         )
         fig.suptitle('Evolution of Statistics Over Time', fontsize=20, y=0.99)
         colors = plt.cm.viridis(np.linspace(0, 1, len(stats_to_plot)))
@@ -212,7 +183,8 @@ class DataVisualizer:
             return
 
         plt.figure(figsize=(15, 7))
-        bin_size = df['frequency_bin'].iloc[1] - df['frequency_bin'].iloc[0] if len(df) > 1 else 10
+        bin_size = df['frequency_bin'].iloc[1] - \
+            df['frequency_bin'].iloc[0] if len(df) > 1 else 10
 
         plt.bar(
             df['frequency_bin'],
@@ -245,16 +217,17 @@ class DataVisualizer:
 
         # タイムスタンプでソート・インデックス化
         try:
-             # file_source カラムからタイムスタンプを抽出する共通ロジック
-             # diff_dfのsource_fileは "Current_vs_Previous_diff.csv" のような形式で、
-             # Current側のタイムスタンプを採用するのが適切。
+            # file_source カラムからタイムスタンプを抽出する共通ロジック
+            # diff_dfのsource_fileは "Current_vs_Previous_diff.csv" のような形式で、
+            # Current側のタイムスタンプを採用するのが適切。
             stats_df['timestamp'] = pd.to_datetime(
                 stats_df['file_source'].str.split('_').str[0],
                 format='%Y%m%dT%H%M%S',
                 errors='coerce'
             )
-            stats_df = stats_df.dropna(subset=['timestamp']).set_index('timestamp').sort_index()
-            
+            stats_df = stats_df.dropna(subset=['timestamp']).set_index(
+                'timestamp').sort_index()
+
             # diff_dfのsource_file例: "2023..._vs_2023..._diff.csv"
             # 最初のYYYYMMDD...を取得する
             diff_df['timestamp'] = pd.to_datetime(
@@ -262,18 +235,19 @@ class DataVisualizer:
                 format='%Y%m%dT%H%M%S',
                 errors='coerce'
             )
-            diff_df = diff_df.dropna(subset=['timestamp']).set_index('timestamp').sort_index()
+            diff_df = diff_df.dropna(subset=['timestamp']).set_index(
+                'timestamp').sort_index()
 
         except Exception as e:
             print(f"  [エラー] タイムスタンプ解析エラー: {e}")
             return
-            
+
         # 共通の期間（または結合）を取得
         common_indices = stats_df.index.intersection(diff_df.index)
         if len(common_indices) == 0:
-             print("  [警告] 統計データと差分データで共通のタイムスタンプがありません。")
-             return
-             
+            print("  [警告] 統計データと差分データで共通のタイムスタンプがありません。")
+            return
+
         # プロット用データ
         s_df = stats_df.loc[common_indices]
         d_df = diff_df.loc[common_indices]
@@ -282,33 +256,50 @@ class DataVisualizer:
         for stat in target_stats:
             if stat not in s_df.columns:
                 continue
-                
+
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12), sharex=True)
-            
+
             # 上段: 基本統計量
             ax1.plot(s_df.index, s_df[stat], marker='o', color='b', label=stat)
             ax1.set_title(f"Statistics Evolution: {stat}", fontsize=14)
             ax1.set_ylabel(stat)
             ax1.grid(True, linestyle='--')
             ax1.legend()
-            
+
             # 下段: 差分統計量 (Mean Abs Diff と Total Abs Change を表示)
             if 'mean_abs_diff' in d_df.columns:
-                ax2.plot(d_df.index, d_df['mean_abs_diff'], marker='x', color='r', label='Mean Abs Diff')
+                ax2.plot(
+                    d_df.index,
+                    d_df['mean_abs_diff'],
+                    marker='x',
+                    color='r',
+                    label='Mean Abs Diff'
+                )
             if 'max_diff' in d_df.columns:
                 ax2_twin = ax2.twinx()
-                ax2_twin.plot(d_df.index, d_df['max_diff'], marker='.', color='orange', linestyle='--', label='Max Diff')
+                ax2_twin.plot(
+                    d_df.index,
+                    d_df['max_diff'],
+                    marker='.',
+                    color='orange',
+                    linestyle='--',
+                    label='Max Diff'
+                )
                 ax2_twin.set_ylabel('Max Diff')
                 # legendの統合は少し面倒だが、ここでは簡易的に
-            
-            ax2.set_title("Difference Evolution (Changes from previous)", fontsize=14)
+
+            ax2.set_title(
+                "Difference Evolution (Changes from previous)",
+                fontsize=14
+            )
             ax2.set_xlabel("Timestamp")
             ax2.set_ylabel("Mean Abs Difference")
             ax2.grid(True, linestyle='--')
             ax2.legend(loc='upper left')
 
             plt.tight_layout()
-            save_path = os.path.join(output_dir, f"combined_evolution_{stat}.png")
+            save_path = os.path.join(
+                output_dir, f"combined_evolution_{stat}.png")
             plt.savefig(save_path)
             plt.close()
             print(f"  - 複合グラフを保存しました: {save_path}")

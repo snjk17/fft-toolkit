@@ -36,8 +36,6 @@ class UnifiedAnalyzer:
             return pd.Series(dtype=float)
 
         stats = self.df['value'].describe()
-        stats['skewness'] = self.df['value'].skew()
-        stats['kurtosis'] = self.df['value'].kurt()
         return stats
 
     # --- FFT 計算 ---
@@ -112,16 +110,6 @@ class UnifiedAnalyzer:
             return float('nan')
         return float(np.std(amplitudes))
 
-    def skewness_amplitude(self, amplitudes, sampling_rate=1000):
-        if amplitudes.size == 0:
-            return float('nan')
-        return float(scipy_stats.skew(amplitudes))
-
-    def kurtosis_amplitude(self, amplitudes, sampling_rate=1000):
-        if amplitudes.size == 0:
-            return float('nan')
-        return float(scipy_stats.kurtosis(amplitudes))
-
     def mean_power(self, amplitudes, sampling_rate=1000):
         if amplitudes.size == 0:
             return float('nan')
@@ -165,7 +153,6 @@ class UnifiedAnalyzer:
             # フィルタで全てのデータが除外された場合はデフォルト/空の統計量を返す
             return {
                 'mean_amplitude': 0, 'std_amplitude': 0,
-                'skewness_amplitude': 0, 'kurtosis_amplitude': 0,
                 'mean_power': 0, 'std_power': 0, 'spectral_entropy': 0,
                 'dominant_frequency': 0
             }
@@ -173,8 +160,6 @@ class UnifiedAnalyzer:
         stats = {
             'mean_amplitude': self.mean_amplitude(amps),
             'std_amplitude': self.std_amplitude(amps),
-            'skewness_amplitude': self.skewness_amplitude(amps),
-            'kurtosis_amplitude': self.kurtosis_amplitude(amps),
             'mean_power': self.mean_power(amps),
             'std_power': self.std_power(amps),
             'spectral_entropy': self.spectral_entropy(amps),
@@ -251,27 +236,6 @@ class UnifiedAnalyzer:
                 'bin_end': next_freq,
             }
 
-            if bin_amps.size > 0:
-                bin_energy = np.sum(bin_amps ** 2)
-                stats['mean_amplitude'] = np.mean(bin_amps)
-                stats['max_amplitude'] = np.max(bin_amps)
-                stats['energy'] = bin_energy
-                stats['energy_ratio'] = bin_energy / \
-                    total_energy if total_energy > 0 else 0
-                stats['std_amplitude'] = np.std(bin_amps)
-            else:
-                stats['mean_amplitude'] = 0
-                stats['max_amplitude'] = 0
-                stats['energy'] = 0
-                stats['energy_ratio'] = 0
-                stats['std_amplitude'] = 0
-
-            bins.append(stats)
-            current_freq = next_freq
-
-        return pd.DataFrame(bins)
-
-    @staticmethod
     def aggregate_binned_diff_stats(diff_df, bin_size=10, max_freq=500):
         """
         1Hzごとの差分データ(diff_df)を受け取り、より大きなbin_size(デフォルト10Hz)で集約統計量を計算する。

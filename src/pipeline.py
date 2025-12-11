@@ -268,7 +268,9 @@ def run_visualization(target_dir, config):
                 save_path = os.path.join(
                     fig_ts_dir, f"{os.path.splitext(os.path.basename(f))[0]}.png")
                 visualizer.plot_timeseries(
-                    df, title=os.path.basename(f), save_path=save_path)
+                    df, title=os.path.basename(f), save_path=save_path,
+                    y_limit=config.get("timeseries_y_limit")
+                )
             except Exception:
                 pass
 
@@ -278,22 +280,6 @@ def run_visualization(target_dir, config):
 
     if os.path.exists(fft_csv_dir):
         print("  - 個別FFTグラフ作成中...")
-        for f in glob.glob(os.path.join(fft_csv_dir, "*_fft.csv")):
-            try:
-                df = pd.read_csv(f)
-                save_path = os.path.join(
-                    fig_fft_dir, f"{os.path.splitext(os.path.basename(f))[0]}.png")
-                visualizer.plot_fft(
-                    df['frequency_hz'], df['amplitude'],
-                    title=os.path.basename(f),
-                    x_limit=config.get("fft_x_limit"),
-                    y_limit=config["fft_y_limit"],
-                    save_path=save_path
-                )
-            except Exception:
-                pass
-
-    # 4-2. 推移グラフ (Statistics Evolution)
     stats_summary_path = os.path.join(
         target_dir, dirs["stats_summary"], config["filenames"]["stats_summary"])
     fig_stats_path = os.path.join(
