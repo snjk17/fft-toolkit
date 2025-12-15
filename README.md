@@ -79,6 +79,11 @@ python main.py --visualize
 - `csv_trim/`: トリミング済み時系列CSV
 - `csv-fft/`: FFT解析結果CSV
 - `stats-summary/`: 統計量サマリーCSV
-- `fig-wave-fft/`: 時系列+FFTの複合グラフ画像
+- `stats-binned/`: 周波数帯域ごとの集約統計CSV (0Hz-10Hz, 10Hz-20Hz...)
+- `diff-stats-binned/`: 周波数帯域ごとの差分集約統計CSV
+- `fig-timeseries/`: 個別時系列グラフ
+- `fig-fft/`: 個別FFTグラフ
+- `fig-time-fft/`: 時系列+FFTの複合グラフ画像
 - `fig-statistics/`: 統計量の推移グラフ画像
+- `fig-diff-summary/`: FFT差分グラフ画像
 - `fig-diff-summary/`: FFT差分グラフ画像

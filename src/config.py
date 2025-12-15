@@ -21,6 +21,11 @@ DEFAULT_CONFIG = {
     "fft_x_limit": {"min": 0, "max": 500},  # FFTグラフの横軸の範囲(Hz)
     # FFT統計量を計算する周波数範囲(Hz)
     "fft_stats_freq_range": {"min": 30, "max": 130},
+    # 10Hz区切りの統計解析設定
+    "fft_binned_stats": {
+        "bin_size": 10,
+        "max_freq": 500
+    },
     "rounding_digits": 4,   # CSV保存時の小数点以下の丸め桁数
 
     # FFT差分分析のパラメータ
@@ -51,6 +56,7 @@ DEFAULT_CONFIG = {
         "fig_diff_evolution": "fig-fft-diff",  # 差分時系列グラフの保存先
         "fig_diff_summary": "fig-diff-summary",    # 個別差分グラフの保存先
         "fig_combined": "fig-combined",        # 複合グラフの保存先
+        "fig_time_fft": "fig-time-fft",        # 時系列+FFT複合グラフの保存先
     },
 
     # 生成されるファイル名

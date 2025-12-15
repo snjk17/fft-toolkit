@@ -235,7 +235,29 @@ class UnifiedAnalyzer:
                 'bin_start': current_freq,
                 'bin_end': next_freq,
             }
+            if bin_amps.size > 0:
+                bin_energy = np.sum(bin_amps ** 2)
+                stats['mean_amplitude'] = np.mean(bin_amps)
+                stats['max_amplitude'] = np.max(bin_amps)
+                stats['energy'] = bin_energy
+                stats['energy_ratio'] = bin_energy / \
+                    total_energy if total_energy > 0 else 0
+                stats['std_amplitude'] = np.std(bin_amps)
+                stats['variance'] = np.var(bin_amps)
+            else:
+                stats['mean_amplitude'] = 0
+                stats['max_amplitude'] = 0
+                stats['energy'] = 0
+                stats['energy_ratio'] = 0
+                stats['std_amplitude'] = 0
+                stats['variance'] = 0
 
+            bins.append(stats)
+            current_freq = next_freq
+
+        return pd.DataFrame(bins)
+
+    @staticmethod
     def aggregate_binned_diff_stats(diff_df, bin_size=10, max_freq=500):
         """
         1Hzごとの差分データ(diff_df)を受け取り、より大きなbin_size(デフォルト10Hz)で集約統計量を計算する。

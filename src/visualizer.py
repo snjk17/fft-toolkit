@@ -34,9 +34,84 @@ class DataVisualizer:
         plt.tight_layout()
 
         if save_path:
+            plt.savefig(save_path)
+            print(f"  - 時系列グラフを保存しました: {save_path}")
+        else:
+            plt.show()
+        plt.close()
+
+    def plot_fft(self, df, title="FFT Spectrum", save_path=None, x_limit=None, y_limit=None):
+        """
+        FFTデータを可視化し、ファイルに保存する。
+        """
+        plt.figure(figsize=(15, 7))
+        plt.plot(df['frequency_hz'], df['amplitude'],
+                 alpha=0.8, color='orange')
+        plt.title(title, fontsize=16)
+        plt.xlabel("Frequency (Hz)")
+        plt.ylabel("Amplitude")
+
+        if x_limit and x_limit.get("min") is not None and x_limit.get("max") is not None:
+            plt.xlim(x_limit["min"], x_limit["max"])
+
+        if y_limit:
+            if isinstance(y_limit, dict):
+                if y_limit.get("min") is not None and y_limit.get("max") is not None:
+                    plt.ylim(y_limit["min"], y_limit["max"])
+            elif isinstance(y_limit, (int, float)):
+                plt.ylim(0, y_limit)
+
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.tight_layout()
+
         if save_path:
             plt.savefig(save_path)
             print(f"  - FFTグラフを保存しました: {save_path}")
+        else:
+            plt.show()
+        plt.close()
+
+    def plot_time_and_fft_combined(self, time_df, fft_df, title="Time Series & FFT", save_path=None,
+                                   timeseries_y_limit=None, fft_x_limit=None, fft_y_limit=None):
+        """
+        時系列データ（上段）とFFTデータ（下段）を縦に並べてプロットする。
+        """
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 12))
+        fig.suptitle(title, fontsize=18)
+
+        # 上段: 時系列
+        ax1.plot(time_df.index, time_df['value'], alpha=0.8, color='blue')
+        ax1.set_title("Time Series", fontsize=14)
+        ax1.set_xlabel("Sample Index")
+        ax1.set_ylabel("Value")
+        ax1.grid(True, linestyle='--', alpha=0.6)
+
+        if timeseries_y_limit and timeseries_y_limit.get("min") is not None and timeseries_y_limit.get("max") is not None:
+            ax1.set_ylim(timeseries_y_limit["min"], timeseries_y_limit["max"])
+
+        # 下段: FFT
+        ax2.plot(fft_df['frequency_hz'], fft_df['amplitude'],
+                 alpha=0.8, color='orange')
+        ax2.set_title("FFT Spectrum", fontsize=14)
+        ax2.set_xlabel("Frequency (Hz)")
+        ax2.set_ylabel("Amplitude")
+        ax2.grid(True, linestyle='--', alpha=0.6)
+
+        if fft_x_limit and fft_x_limit.get("min") is not None and fft_x_limit.get("max") is not None:
+            ax2.set_xlim(fft_x_limit["min"], fft_x_limit["max"])
+
+        if fft_y_limit:
+            if isinstance(fft_y_limit, dict):
+                if fft_y_limit.get("min") is not None and fft_y_limit.get("max") is not None:
+                    ax2.set_ylim(fft_y_limit["min"], fft_y_limit["max"])
+            elif isinstance(fft_y_limit, (int, float)):
+                ax2.set_ylim(0, fft_y_limit)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.97])  # タイトル分のスペース確保
+
+        if save_path:
+            plt.savefig(save_path)
+            print(f"  - 時系列+FFT複合グラフを保存しました: {save_path}")
         else:
             plt.show()
         plt.close()

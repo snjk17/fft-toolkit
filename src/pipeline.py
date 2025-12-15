@@ -80,6 +80,9 @@ def run_basic_analysis(target_dir, config):
     csv_files = sorted(glob.glob(os.path.join(source_csv_dir, "*.csv")))
     all_stats = []
 
+    # バンド別統計量を集約するためのリスト
+    all_binned_stats_list = []
+
     print(f"  [情報] {len(csv_files)} ファイルを解析します...")
 
     for file_path in csv_files:
@@ -119,15 +122,9 @@ def run_basic_analysis(target_dir, config):
                     sampling_rate=sampling_rate
                 )
 
-                # 保存
-                binned_stats_dir = os.path.join(
-                    target_dir, config["dirs"].get("binned_stats", "stats-binned"))
-                os.makedirs(binned_stats_dir, exist_ok=True)
-
-                binned_save_path = os.path.join(
-                    binned_stats_dir, f"{os.path.splitext(filename)[0]}_binned_stats.csv")
-                binned_df.round(config["rounding_digits"]).to_csv(
-                    binned_save_path, index=False, encoding='utf-8-sig')
+                # 集約用にファイル名を追加してリストに格納
+                binned_df.insert(0, 'source_filename', filename)
+                all_binned_stats_list.append(binned_df)
 
         except Exception as e:
             print(f"  [エラー] {filename} の解析失敗: {e}")
@@ -145,6 +142,34 @@ def run_basic_analysis(target_dir, config):
         summary_df.round(config["rounding_digits"]).to_csv(
             summary_path, index=False, encoding='utf-8-sig')
         print(f"  [完了] 統計サマリーを保存: {summary_path}")
+
+    # E. バンド別統計量の集約保存
+    if all_binned_stats_list:
+        binned_stats_dir = os.path.join(
+            target_dir, config["dirs"].get("binned_stats", "stats-binned"))
+        os.makedirs(binned_stats_dir, exist_ok=True)
+
+        # 全データを結合
+        full_binned_df = pd.concat(all_binned_stats_list, ignore_index=True)
+
+        # ビンごとにグルーピングして保存
+        # bin_start, bin_end でグループ化
+        grouped = full_binned_df.groupby(['bin_start', 'bin_end'])
+
+        print(f"  [情報] {len(grouped)} 個の周波数帯域の統計ファイルを保存します...")
+
+        for (bin_start, bin_end), group in grouped:
+            # ファイル名: binned_stats_0Hz_10Hz.csv
+            save_filename = f"binned_stats_{int(bin_start)}Hz_{int(bin_end)}Hz.csv"
+            save_path = os.path.join(binned_stats_dir, save_filename)
+
+            # 不要な列を整理（bin_start, bin_endはファイル名にあるので削除してもいいが、念のため残すか、indexにする）
+            # ここではそのまま保存する
+
+            group.round(config["rounding_digits"]).to_csv(
+                save_path, index=False, encoding='utf-8-sig')
+
+        print(f"  [完了] バンド別統計量を保存: {binned_stats_dir}")
 
 
 # --- 3. 差分解析 (Differential Analysis) ---
@@ -179,6 +204,9 @@ def run_diff_analysis(target_dir, config):
     previous_binned_fft = None
     previous_filename = None
     diff_stats_list = []
+
+    # バンド別差分統計量を集約するためのリスト
+    all_binned_diff_stats_list = []
 
     print(f"  [情報] {len(file_list)} ファイル間の差分を計算します (Bin Size: {bin_size}Hz)...")
 
@@ -222,10 +250,10 @@ def run_diff_analysis(target_dir, config):
                 binned_diff_df = UnifiedAnalyzer.aggregate_binned_diff_stats(
                     diff_df, bin_size=10, max_freq=config["fft_binned_stats"]["max_freq"]
                 )
-                binned_diff_save_path = os.path.join(
-                    diff_binned_stats_dir, f"{curr_base}_vs_{prev_base}_binned_diff_stats.csv")
-                binned_diff_df.round(config["rounding_digits"]).to_csv(
-                    binned_diff_save_path, index=False, encoding='utf-8-sig')
+
+                # 集約用にソースファイル名を追加してリストに格納
+                binned_diff_df.insert(0, 'source_filename', diff_filename)
+                all_binned_diff_stats_list.append(binned_diff_df)
 
             previous_binned_fft = current_binned_fft
             previous_filename = filename
@@ -241,6 +269,26 @@ def run_diff_analysis(target_dir, config):
         summary_stats_df.round(config["rounding_digits"]).to_csv(
             summary_stats_path, index=False, encoding='utf-8-sig')
         print(f"  [完了] 差分統計サマリーを保存: {summary_stats_path}")
+
+    # 3. バンド別差分統計量の集約保存
+    if all_binned_diff_stats_list:
+        full_diff_binned_df = pd.concat(
+            all_binned_diff_stats_list, ignore_index=True)
+
+        # ビンごとにグルーピングして保存
+        grouped = full_diff_binned_df.groupby(['bin_start', 'bin_end'])
+
+        print(f"  [情報] {len(grouped)} 個の周波数帯域の差分統計ファイルを保存します...")
+
+        for (bin_start, bin_end), group in grouped:
+            # ファイル名: diff_binned_stats_0Hz_10Hz.csv
+            save_filename = f"diff_binned_stats_{int(bin_start)}Hz_{int(bin_end)}Hz.csv"
+            save_path = os.path.join(diff_binned_stats_dir, save_filename)
+
+            group.round(config["rounding_digits"]).to_csv(
+                save_path, index=False, encoding='utf-8-sig')
+
+        print(f"  [完了] バンド別差分統計量を保存: {diff_binned_stats_dir}")
 
 
 # --- 4. 可視化 (Visualization) ---
@@ -276,10 +324,60 @@ def run_visualization(target_dir, config):
 
     fft_csv_dir = os.path.join(target_dir, dirs["fft_csv"])
     fig_fft_dir = os.path.join(target_dir, dirs["fig_fft"])
+    fig_time_fft_dir = os.path.join(target_dir, dirs.get(
+        "fig_time_fft", "fig-time-fft"))  # Configにキーがない場合のフォールバック
     os.makedirs(fig_fft_dir, exist_ok=True)
+    os.makedirs(fig_time_fft_dir, exist_ok=True)
 
     if os.path.exists(fft_csv_dir):
-        print("  - 個別FFTグラフ作成中...")
+        print("  - 個別FFTグラフ & 複合グラフ(Time+FFT)作成中...")
+        fft_files = glob.glob(os.path.join(fft_csv_dir, "*_fft.csv"))
+
+        for fft_file in fft_files:
+            try:
+                fft_df = pd.read_csv(fft_file)
+                base_name = os.path.basename(fft_file).replace('_fft.csv', '')
+
+                # 1. 個別FFTグラフ
+                save_path_fft = os.path.join(
+                    fig_fft_dir, f"{base_name}_fft.png")
+                visualizer.plot_fft(
+                    fft_df,
+                    title=f"FFT Spectrum: {base_name}",
+                    save_path=save_path_fft,
+                    x_limit=config.get("fft_x_limit"),
+                    y_limit=config.get("fft_y_limit")
+                )
+
+                # 2. Time + FFT 複合グラフ
+                # 対応する時系列CSVを探す
+                # 時系列ファイルの拡張子は.csv, 名前は base_name と一致するはず
+                time_csv_path = os.path.join(
+                    source_csv_dir, f"{base_name}.csv")
+
+                if os.path.exists(time_csv_path):
+                    time_df = pd.read_csv(
+                        time_csv_path, index_col=None)  # index_colは適宜
+                    # index_col='sample_index' がある場合はそれを使うが、
+                    # 先ほどの plot_timeseries では index_col='sample_index' で読んでいた。
+                    # ここでは汎用的に読む。
+
+                    save_path_combined = os.path.join(
+                        fig_time_fft_dir, f"{base_name}_time_fft.png")
+                    visualizer.plot_time_and_fft_combined(
+                        time_df,
+                        fft_df,
+                        title=f"Time Series & FFT: {base_name}",
+                        save_path=save_path_combined,
+                        timeseries_y_limit=config.get("timeseries_y_limit"),
+                        fft_x_limit=config.get("fft_x_limit"),
+                        fft_y_limit=config.get("fft_y_limit")
+                    )
+
+            except Exception as e:
+                print(
+                    f"  [エラー] FFTグラフ作成失敗 ({os.path.basename(fft_file)}): {e}")
+
     stats_summary_path = os.path.join(
         target_dir, dirs["stats_summary"], config["filenames"]["stats_summary"])
     fig_stats_path = os.path.join(
