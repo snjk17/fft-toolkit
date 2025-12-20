@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     "plot_diff_bins": [],               # 時系列プロットしたい周波数ビン(Hz) - 不要なため空リスト
 
     # 個別差分グラフのY軸範囲（Noneの場合は自動調整）
-    "plot_diff_summary_y_limit": {"min": -5000, "max": 5000},
+    "plot_diff_summary_y_limit": {"min": -2500, "max": 2500},
 
     # 可視化パラメータ
     "statistics_to_plot": [  # 時系列変化をプロットする統計量
@@ -57,6 +57,9 @@ DEFAULT_CONFIG = {
         "fig_diff_summary": "fig-diff-summary",    # 個別差分グラフの保存先
         "fig_combined": "fig-combined",        # 複合グラフの保存先
         "fig_time_fft": "fig-time-fft",        # 時系列+FFT複合グラフの保存先
+        "fig_binned_stats": "fig-stats-binned", # バンド別統計量グラフの保存先
+        "fig_combined_interactive": "fig-combined-interactive", # 統合インタラクティブグラフの保存先
+        "fig_diff_combined_interactive": "fig-diff-combined-interactive", # 統合インタラクティブ差分グラフの保存先
     },
 
     # 生成されるファイル名

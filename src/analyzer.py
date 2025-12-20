@@ -292,12 +292,16 @@ class UnifiedAnalyzer:
                 stats['sum_abs_diff'] = np.sum(abs_diffs)
                 stats['mean_abs_diff'] = np.mean(abs_diffs)
                 stats['max_abs_diff'] = np.max(abs_diffs)
-                stats['mean_diff'] = np.mean(diffs)  # 符号ありの平均
+                stats['mean_diff'] = np.mean(diffs)
+                stats['std_diff'] = np.std(diffs)
+                stats['variance_diff'] = np.var(diffs)
             else:
                 stats['sum_abs_diff'] = 0
                 stats['mean_abs_diff'] = 0
                 stats['max_abs_diff'] = 0
                 stats['mean_diff'] = 0
+                stats['std_diff'] = 0
+                stats['variance_diff'] = 0
 
             bins.append(stats)
             current_freq = next_freq

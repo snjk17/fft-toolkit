@@ -378,3 +378,77 @@ class DataVisualizer:
             plt.savefig(save_path)
             plt.close()
             print(f"  - 複合グラフを保存しました: {save_path}")
+
+    def plot_binned_statistics_evolution(self, csv_path, output_fig_path):
+        """
+        バンド別統計量（binned_stats_...csv）を読み込み、各統計量の時系列変化をグラフ化して保存する。
+        """
+        try:
+            df = pd.read_csv(csv_path)
+            if df.empty:
+                return
+        except FileNotFoundError:
+            print(f"エラー: ファイルが見つかりません: {csv_path}")
+            return
+
+        try:
+            # source_filenameからタイムスタンプを抽出 (例: 20231208T153920_...)
+            df['timestamp'] = pd.to_datetime(
+                df['source_filename'].str.split('_').str[0],
+                format='%Y%m%dT%H%M%S'
+            )
+            df = df.set_index('timestamp').sort_index()
+        except Exception as e:
+            print(f"タイムスタンプ解析中にエラー: {e}")
+            return
+
+        stats_to_plot = [
+            'mean_amplitude',
+            'max_amplitude',
+            'energy',
+            'energy_ratio',
+            'std_amplitude',
+            'variance'
+        ]
+
+        # 存在するカラムのみをプロット対象にする
+        actual_stats = [s for s in stats_to_plot if s in df.columns]
+        if not actual_stats:
+            return
+
+        fig, axes = plt.subplots(
+            nrows=len(actual_stats),
+            ncols=1,
+            figsize=(15, 3 * len(actual_stats)),
+            sharex=True
+        )
+        if len(actual_stats) == 1:
+            axes = [axes]
+
+        bin_info = f"{df['bin_start'].iloc[0]}Hz - {df['bin_end'].iloc[0]}Hz"
+        fig.suptitle(f'Binned Statistics Evolution ({bin_info})', fontsize=20, y=0.99)
+        colors = plt.cm.viridis(np.linspace(0, 1, len(actual_stats)))
+
+        for i, stat in enumerate(actual_stats):
+            ax = axes[i]
+            ax.plot(
+                df.index,
+                df[stat],
+                marker='o',
+                linestyle='-',
+                color=colors[i])
+            ax.set_ylabel(stat)
+            ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+
+        axes[-1].set_xlabel('Timestamp')
+        fig.autofmt_xdate()
+        plt.tight_layout(rect=[0, 0, 1, 0.97])
+
+        try:
+            os.makedirs(os.path.dirname(output_fig_path), exist_ok=True)
+            plt.savefig(output_fig_path)
+            print(f"  - バンド別統計推移グラフを保存しました: {output_fig_path}")
+        except Exception as e:
+            print(f"グラフの保存エラー: {e}")
+
+        plt.close()
