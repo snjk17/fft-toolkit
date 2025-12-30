@@ -12,6 +12,13 @@ DEFAULT_CONFIG = {
         "がたつき解析/11170301",
     ],
 
+    # 基準として扱う正常データフォルダ
+    "normal_folders": [
+        "11170101_交換後",
+        "11170201",
+        "11170301",
+    ],
+
     # 解析パラメータ
     "sampling_rate": 1000,  # サンプリングレート (Hz)
     # 時系列グラフの縦軸範囲（Noneの場合は自動調整）
@@ -30,9 +37,9 @@ DEFAULT_CONFIG = {
 
     # FFT差分分析のパラメータ
     "fft_diff_freq_range": {"min": 0, "max": 500},  # FFT差分を計算する周波数範囲(Hz)
-    # FFTを集約する周波数ビンのサイズ(Hz) - 1Hzに変更
+    # FFTを集約する周波数ビンのサイズ(Hz)
     "fft_diff_bin_size": 1,
-    "plot_diff_bins": [],               # 時系列プロットしたい周波数ビン(Hz) - 不要なため空リスト
+    "plot_diff_bins": [], # 時系列プロットしたい周波数ビン(Hz) 
 
     # 個別差分グラフのY軸範囲（Noneの場合は自動調整）
     "plot_diff_summary_y_limit": {"min": -2500, "max": 2500},

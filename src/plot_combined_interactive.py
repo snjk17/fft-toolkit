@@ -17,10 +17,12 @@ def main():
     
     dirs = config["dirs"]
     binned_stats_dirname = dirs.get("binned_stats", "stats-binned")
-    output_dirname = dirs.get("fig_combined_interactive", "fig-combined-interactive")
+    output_dirname = os.path.join("がたつき解析", "帯域別統計量の時間推移")
     
     output_dir = os.path.join(base_dir, output_dirname)
-    os.makedirs(output_dir, exist_ok=True)
+    html_output_dir = os.path.join(output_dir, "html") # HTML専用サブフォルダ
+    
+    os.makedirs(html_output_dir, exist_ok=True)
     
     print(f"=== 統合インタラクティブプロット生成開始 ===")
     
@@ -36,7 +38,7 @@ def main():
         if not os.path.exists(stats_dir):
             continue
             
-        csv_files = glob.glob(os.path.join(stats_dir, "binned_stats_*.csv"))
+        csv_files = glob.glob(os.path.join(stats_dir, "*Hz-*Hz.csv"))
         for csv_path in csv_files:
             bin_name = os.path.basename(csv_path).replace(".csv", "")
             try:
@@ -69,6 +71,11 @@ def main():
         'variance'
     ]
     
+    # 正常データの基準統計、異常カウント、詳細ログを保持するためのリスト
+    reference_stats_list = []
+    anomaly_counts_map = {} # (timestamp, folder, stat) -> {'σ':0, '2σ':0, '3σ':0}
+    anomaly_details = []
+    
     for bin_name, df_list in all_data_by_bin.items():
         if not df_list:
             continue
@@ -88,20 +95,93 @@ def main():
         
         bin_info = f"{combined_df['bin_start'].iloc[0]}Hz - {combined_df['bin_end'].iloc[0]}Hz"
         
-        # フォルダごとの色を取得するために一時的な図を作成せず、手動で割り当てるかPlotlyのデフォルト色に頼る
-        # Plotly Expressを使用してトレースを生成するのが簡単
+        # 3. 正常データの統計量計算 (基準線用)
+        normal_folders = config.get("normal_folders", [])
+        normal_df = combined_df[combined_df['folder'].isin(normal_folders)]
         
         # 各統計量ごとにプロット
         for i, stat in enumerate(stats_to_plot):
             if stat not in combined_df.columns:
                 continue
-                
-            # フォルダごとに色分けしてトレースを追加
-            # plotly expressの内部ロジックを模倣して px.line を各サブプロットに適用するのは難しいため、
-            # 直接 go.Scatter を使うか、px.lineで作ったものを読み込むか
             
-            # ここでは go.Scatter を使用して、フォルダごとに色を変える
-            # 色の管理
+            # 基準線の追加
+            if not normal_df.empty and stat in normal_df.columns:
+                mu = normal_df[stat].mean()
+                sigma = normal_df[stat].std()
+                
+                if not pd.isna(mu):
+                    # 統計量の保存用にリストへ追加
+                    reference_stats_list.append({
+                        'bin_name': bin_name,
+                        'statistic': stat,
+                        'mean': mu,
+                        'std': sigma
+                    })
+                    
+                    # 閾値判定とカウント (2σ 追加)
+                    if not pd.isna(sigma) and sigma > 0:
+                        thresh1 = mu + sigma
+                        thresh2 = mu + 2 * sigma
+                        thresh3 = mu + 3 * sigma
+                        
+                        for _, row in combined_df.iterrows():
+                            val = row[stat]
+                            if pd.isna(val): continue
+                            
+                            ex_s = val > thresh1
+                            ex_2s = val > thresh2
+                            ex_3s = val > thresh3
+                            
+                            if ex_s:
+                                key = (row['timestamp'], row['folder'], stat)
+                                if key not in anomaly_counts_map:
+                                    anomaly_counts_map[key] = {'σ': 0, '2σ': 0, '3σ': 0}
+                                
+                                if ex_s: anomaly_counts_map[key]['σ'] += 1
+                                if ex_2s: anomaly_counts_map[key]['2σ'] += 1
+                                if ex_3s: anomaly_counts_map[key]['3σ'] += 1
+                                
+                                # 詳細ログ
+                                type_str = "3σ" if ex_3s else ("2σ" if ex_2s else "σ")
+                                anomaly_details.append({
+                                    'timestamp': row['timestamp'],
+                                    'folder': row['folder'],
+                                    'statistic': stat,
+                                    'bin_name': bin_name,
+                                    'value': val,
+                                    'mean': mu,
+                                    'std': sigma,
+                                    'exceed_type': type_str
+                                })
+
+                    # 平均線の追加 (太め・濃いめ)
+                    fig.add_shape(
+                        type="line", line=dict(color="rgba(100, 100, 100, 0.6)", width=2),
+                        xref=f"x{i+1}", yref=f"y{i+1}",
+                        x0=combined_df['timestamp'].min(), x1=combined_df['timestamp'].max(),
+                        y0=mu, y1=mu,
+                        layer="below"
+                    )
+                    
+                    if not pd.isna(sigma) and sigma > 0:
+                        # sigma, 2sigma, 3sigma の追加
+                        # 細め・薄めの実線
+                        for mult in [1, 2, 3]:
+                            for sign in [1, -1]:
+                                y_val = mu + sign * mult * sigma
+                                fig.add_shape(
+                                    type="line", 
+                                    line=dict(
+                                        color="rgba(150, 150, 150, 0.3)", 
+                                        width=1
+                                    ),
+                                    xref=f"x{i+1}", yref=f"y{i+1}",
+                                    x0=combined_df['timestamp'].min(), x1=combined_df['timestamp'].max(),
+                                    y0=y_val, y1=y_val,
+                                    layer="below"
+                                )
+
+            # フォルダごとに色分けしてトレースを追加
             unique_folders = sorted(combined_df['folder'].unique())
             colors = px.colors.qualitative.Plotly
             
@@ -128,13 +208,49 @@ def main():
             height=300 * len(stats_to_plot),
             title_text=f"Combined Binned Statistics Evolution ({bin_info})",
             xaxis_title="Timestamp",
-            hovermode="closest"
+            hovermode="closest",
+            # y軸の範囲を基準線に合わせて調整（オプション。現状はデータに合わせる）
         )
         
-        # HTMLとして保存
-        save_path = os.path.join(output_dir, f"combined_{bin_name}.html")
+        # HTMLとして保存 (htmlサブフォルダへ)
+        save_path = os.path.join(html_output_dir, f"{bin_name}.html")
         fig.write_html(save_path)
         print(f"  - 統合インタラクティブグラフを保存しました: {save_path}")
+
+    # 4. 正常データの統計量を CSV として保存
+    if reference_stats_list:
+        ref_stats_df = pd.DataFrame(reference_stats_list)
+        # 見やすいようにソート
+        ref_stats_df = ref_stats_df.sort_values(['bin_name', 'statistic'])
+        csv_save_path = os.path.join(output_dir, "reference_stats.csv")
+        ref_stats_df.to_csv(csv_save_path, index=False, encoding='utf-8-sig')
+        print(f"  - 正常データのリファレンス統計量を保存しました: {csv_save_path}")
+
+    # 5. 異常検知カウントの保存
+    if anomaly_counts_map:
+        summary_rows = []
+        for (ts, fld, st), counts in anomaly_counts_map.items():
+            summary_rows.append({
+                'timestamp': ts,
+                'folder': fld,
+                'statistic': st,
+                'exceed_sigma_count': counts['σ'],
+                'exceed_2sigma_count': counts['2σ'],
+                'exceed_3sigma_count': counts['3σ']
+            })
+        summary_df = pd.DataFrame(summary_rows)
+        summary_df = summary_df.sort_values(['timestamp', 'folder', 'statistic'])
+        summary_path = os.path.join(output_dir, "anomaly_counts.csv")
+        summary_df.to_csv(summary_path, index=False, encoding='utf-8-sig')
+        print(f"  - 異常検知サマリー（超過数）を保存しました: {summary_path}")
+
+    # 6. 異常詳細ログの保存
+    if anomaly_details:
+        details_df = pd.DataFrame(anomaly_details)
+        details_df = details_df.sort_values(['timestamp', 'folder', 'statistic', 'bin_name'])
+        details_path = os.path.join(output_dir, "anomaly_details.csv")
+        details_df.to_csv(details_path, index=False, encoding='utf-8-sig')
+        print(f"  - 異常詳細ログ（超過帯域）を保存しました: {details_path}")
 
     print(f"\n=== 全ての処理が完了しました ===")
 
